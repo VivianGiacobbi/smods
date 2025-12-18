@@ -1217,22 +1217,7 @@ SMODS.smart_level_up_hand = function(card, hand, instant, amount)
     -- Level ups in context.before on another hand AND any level up during scoring
     --     -> restore the current chips/mult
     -- Level ups outside anything -> always update to empty chips/mult
-    local vals_after_level
-    if SMODS.displaying_scoring and not (SMODS.displayed_hand == hand) then
-        vals_after_level = copy_table(G.GAME.current_round.current_hand)
-        local text,disp_text,_,_,_ = G.FUNCS.get_poker_hand_info(G.play.cards)
-        vals_after_level.handname = disp_text or ''
-        vals_after_level.level = (G.GAME.hands[text] or {}).level or ''
-        vals_after_level.chips = number_format(hand_chips) or 0
-        vals_after_level.mult = number_format(mult) or 0
-    end
-    if not (instant or SMODS.displayed_hand == hand) then
-        update_hand_text({sound = 'button', volume = 0.7, pitch = 0.8, delay = 0.3}, {handname=localize(hand, 'poker_hands'),chips = G.GAME.hands[hand].chips, mult = G.GAME.hands[hand].mult, level=G.GAME.hands[hand].level})
-    end
     level_up_hand(card, hand, instant, (type(amount) == 'number' or type(amount) == 'table') and amount or 1)
-    if not (instant or SMODS.displayed_hand == hand) then
-        update_hand_text({sound = 'button', volume = 0.7, pitch = 1.1, delay = 0}, vals_after_level or {mult = 0, chips = 0, handname = '', level = ''})
-    end
 end
 
 -- This function handles the calculation of each effect returned to evaluate play.
@@ -3195,7 +3180,7 @@ function SMODS.should_handle_limit(area)
 end
 
 function CardArea:handle_card_limit()
-    if SMODS.should_handle_limit(self) then
+    if SMODS.should_handle_limit(self) and not G.TAROT_INTERRUPT then
         self.config.card_limits.extra_slots = self:count_property('card_limit')
         self.config.card_limits.total_slots = self.config.card_limits.extra_slots + (self.config.card_limits.base or 0) + (self.config.card_limits.mod or 0)
         self.config.card_limits.extra_slots_used = self:count_property('extra_slots_used')
@@ -3271,6 +3256,7 @@ function SMODS.upgrade_poker_hands(args)
     -- args.parameters
     -- args.func
     -- args.level_up
+    -- args.instant
     -- args.from
 
     local function get_keys(t)
@@ -3316,10 +3302,10 @@ function SMODS.upgrade_poker_hands(args)
                 update_hand_text({nopulse = nil, delay = 0}, {[name] = p.current})
             end
         end
-        for _, parameter in ipairs(args.parameters) do
+        for i, parameter in ipairs(args.parameters) do
             G.GAME.hands[hand][parameter] = args.func(G.GAME.hands[hand][parameter], hand, parameter)
             if not instant then
-                G.E_MANAGER:add_event(Event({trigger = 'after', delay = 0.9, func = function()
+                G.E_MANAGER:add_event(Event({trigger = 'after', delay = i == 1 and 0.2 or 0.9, func = function()
                     play_sound('tarot1')
                     if args.from then args.from:juice_up(0.8, 0.5) end
                     G.TAROT_INTERRUPT_PULSE = true
